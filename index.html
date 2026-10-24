@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Password Strength Visualizer</title>
+<meta name="description" content="A live password strength meter that runs entirely in your browser. Nothing you type is ever sent anywhere.">
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-card: #161b22;
+    --bg-input: #0b0f14;
+    --border: #272e3a;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --red: #f85149;
+    --orange: #e3853d;
+    --yellow: #d6b53d;
+    --green: #3fb950;
+    --teal: #39c5bb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #12203a 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { text-align: center; margin-bottom: 28px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 0.95rem; margin: 0; }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  }
+  .field { position: relative; }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding: 14px 52px 14px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus { border-color: var(--accent); }
+  .toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: 0; color: var(--muted);
+    cursor: pointer; font-size: 0.8rem; padding: 8px; border-radius: 6px;
+  }
+  .toggle:hover { color: var(--text); }
+
+  .meter { height: 10px; border-radius: 6px; background: #21262d; margin: 18px 0 8px; overflow: hidden; }
+  .meter > span { display: block; height: 100%; width: 0%; border-radius: 6px; transition: width 0.25s ease, background 0.25s ease; }
+  .verdict { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.95rem; }
+  .verdict .label { font-weight: 600; }
+  .verdict .muted { color: var(--muted); font-size: 0.85rem; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+  .stat { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .k { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.15rem; margin-top: 3px; }
+
+  .rules { list-style: none; padding: 0; margin: 8px 0 0; }
+  .rules li { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--muted); font-size: 0.92rem; }
+  .rules li .box {
+    width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--border);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none;
+  }
+  .rules li.pass { color: var(--text); }
+  .rules li.pass .box { background: rgba(63,185,80,0.15); border-color: var(--green); color: var(--green); }
+
+  .note {
+    margin-top: 22px; padding: 12px 14px; border-radius: 10px;
+    background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.25);
+    color: #b9d4ff; font-size: 0.85rem;
+  }
+  .note b { color: #d7e7ff; }
+  footer { text-align: center; color: var(--muted); font-size: 0.82rem; margin-top: 28px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Password Strength Visualizer</h1>
+      <p class="sub">Type a password and watch it scored live. Everything runs in your browser.</p>
+    </header>
+
+    <div class="card">
+      <div class="field">
+        <input id="pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="Type a password to test" aria-label="Password to test">
+        <button class="toggle" id="toggle" type="button" aria-label="Show or hide password">show</button>
+      </div>
+
+      <div class="meter" aria-hidden="true"><span id="bar"></span></div>
+      <div class="verdict">
+        <span class="label" id="label">Start typing</span>
+        <span class="muted" id="guesses"></span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Length</div><div class="v" id="len">0</div></div>
+        <div class="stat"><div class="k">Entropy</div><div class="v" id="entropy">0 bits</div></div>
+        <div class="stat" style="grid-column: 1 / -1;">
+          <div class="k">Estimated offline crack time</div>
+          <div class="v" id="crack">instant</div>
+        </div>
+      </div>
+
+      <ul class="rules" id="rules"></ul>
+
+      <div class="note">
+        <b>Private by design.</b> This page makes no network requests. Your password
+        is scored with JavaScript on your device and never leaves it. You can open
+        the page source and confirm there is nothing sending it anywhere.
+      </div>
+    </div>
+
+    <footer>
+      Built by <a href="https://github.com/Siddique-12300983">ruxcipher</a> &middot;
+      <a href="https://github.com/Siddique-12300983/password-strength-visualizer">source</a>
+    </footer>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var RULES = [
+    { id: "len",    text: "At least 12 characters",      test: function (p) { return p.length >= 12; } },
+    { id: "lower",  text: "Lowercase letter",            test: function (p) { return /[a-z]/.test(p); } },
+    { id: "upper",  text: "Uppercase letter",            test: function (p) { return /[A-Z]/.test(p); } },
+    { id: "digit",  text: "Number",                      test: function (p) { return /[0-9]/.test(p); } },
+    { id: "symbol", text: "Symbol",                      test: function (p) { return /[^A-Za-z0-9]/.test(p); } },
+    { id: "nocommon", text: "Not an obvious pattern",    test: function (p) { return p.length > 0 && !isObvious(p); } }
+  ];
+
+  var COMMON = [
+    "password", "passw0rd", "123456", "12345678", "123456789", "qwerty",
+    "abc123", "letmein", "admin", "welcome", "monkey", "iloveyou", "dragon",
+    "football", "111111", "000000", "qwertyuiop", "sunshine", "princess"
+  ];
+
+  function isObvious(p) {
+    var low = p.toLowerCase();
+    for (var i = 0; i < COMMON.length; i++) {
+      if (low.indexOf(COMMON[i]) !== -1) return true;
+    }
+    if (/^(.)\1+$/.test(p)) return true;              // all one character
+    if (/^(..)\1+$/.test(p)) return true;             // repeated pair
+    if (isSequential(low)) return true;               // abcdef / 123456
+    return false;
+  }
+
+  function isSequential(s) {
+    if (s.length < 4) return false;
+    var asc = 0, desc = 0;
+    for (var i = 1; i < s.length; i++) {
+      var d = s.charCodeAt(i) - s.charCodeAt(i - 1);
+      if (d === 1) asc++; else asc = 0;
+      if (d === -1) desc++; else desc = 0;
+      if (asc >= 3 || desc >= 3) return true;
+    }
+    return false;
+  }
+
+  function charsetSize(p) {
+    var size = 0;
+    if (/[a-z]/.test(p)) size += 26;
+    if (/[A-Z]/.test(p)) size += 26;
+    if (/[0-9]/.test(p)) size += 10;
+    if (/[^A-Za-z0-9]/.test(p)) size += 33;           // common printable symbols
+    return size;
+  }
+
+  // Entropy in bits = length * log2(charset). Penalise obvious passwords hard,
+  // since their real guessability is far lower than the raw math suggests.
+  function entropyBits(p) {
+    if (!p) return 0;
+    var size = charsetSize(p) || 1;
+    var bits = p.length * (Math.log(size) / Math.log(2));
+    if (isObvious(p)) bits = Math.min(bits, 12);
+    return bits;
+  }
+
+  function humanTime(seconds) {
+    if (seconds < 1) return "instant";
+    var units = [
+      ["year", 31557600], ["day", 86400], ["hour", 3600],
+      ["minute", 60], ["second", 1]
+    ];
+    if (seconds > 31557600 * 1e6) {
+      var millions = seconds / (31557600 * 1e6);
+      if (millions > 1e6) return "longer than the age of the universe";
+      return Math.round(millions).toLocaleString() + " million years";
+    }
+    for (var i = 0; i < units.length; i++) {
+      if (seconds >= units[i][1]) {
+        var n = Math.round(seconds / units[i][1]);
+        return n.toLocaleString() + " " + units[i][0] + (n === 1 ? "" : "s");
+      }
+    }
+    return "instant";
+  }
+
+  // A fast offline attacker on commodity GPUs: ~100 billion guesses/second.
+  var GUESSES_PER_SEC = 1e11;
+
+  var SCALE = [
+    { max: 28,  label: "Very weak",  color: "var(--red)" },
+    { max: 40,  label: "Weak",       color: "var(--orange)" },
+    { max: 60,  label: "Fair",       color: "var(--yellow)" },
+    { max: 80,  label: "Strong",     color: "var(--green)" },
+    { max: 1e9, label: "Very strong",color: "var(--teal)" }
+  ];
+
+  var pw = document.getElementById("pw");
+  var bar = document.getElementById("bar");
+  var label = document.getElementById("label");
+  var guesses = document.getElementById("guesses");
+  var lenEl = document.getElementById("len");
+  var entEl = document.getElementById("entropy");
+  var crackEl = document.getElementById("crack");
+  var rulesEl = document.getElementById("rules");
+  var toggle = document.getElementById("toggle");
+
+  RULES.forEach(function (r) {
+    var li = document.createElement("li");
+    li.id = "rule-" + r.id;
+    li.innerHTML = '<span class="box"></span><span>' + r.text + '</span>';
+    rulesEl.appendChild(li);
+  });
+
+  function tier(bits) {
+    for (var i = 0; i < SCALE.length; i++) {
+      if (bits <= SCALE[i].max) return SCALE[i];
+    }
+    return SCALE[SCALE.length - 1];
+  }
+
+  function render() {
+    var p = pw.value;
+    var bits = entropyBits(p);
+    var t = tier(bits);
+
+    var pct = Math.max(p ? 6 : 0, Math.min(100, (bits / 90) * 100));
+    bar.style.width = pct + "%";
+    bar.style.background = t.color;
+
+    label.textContent = p ? t.label : "Start typing";
+    label.style.color = p ? t.color : "var(--muted)";
+
+    lenEl.textContent = p.length;
+    entEl.textContent = Math.round(bits) + " bits";
+
+    if (!p) {
+      crackEl.textContent = "instant";
+      guesses.textContent = "";
+    } else {
+      // Average attempts is half the search space of 2^bits.
+      var seconds = (Math.pow(2, bits) / 2) / GUESSES_PER_SEC;
+      crackEl.textContent = humanTime(seconds);
+      guesses.textContent = "at ~100 billion guesses/sec";
+    }
+
+    RULES.forEach(function (r) {
+      var li = document.getElementById("rule-" + r.id);
+      var ok = r.test(p);
+      li.className = ok ? "pass" : "";
+      li.querySelector(".box").textContent = ok ? "✓" : "";
+    });
+  }
+
+  toggle.addEventListener("click", function () {
+    var showing = pw.type === "text";
+    pw.type = showing ? "password" : "text";
+    toggle.textContent = showing ? "show" : "hide";
+    pw.focus();
+  });
+
+  pw.addEventListener("input", render);
+  render();
+})();
+</script>
+</body>
+</html>
