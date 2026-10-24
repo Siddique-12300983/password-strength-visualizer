@@ -81,6 +81,14 @@
   .rules li.pass { color: var(--text); }
   .rules li.pass .box { background: rgba(63,185,80,0.15); border-color: var(--green); color: var(--green); }
 
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 4px; }
+  .examples-label { color: var(--muted); font-size: 0.82rem; margin-right: 2px; }
+  .examples button {
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text);
+    border-radius: 999px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; transition: border-color 0.15s;
+  }
+  .examples button:hover { border-color: var(--accent); }
   .note {
     margin-top: 22px; padding: 12px 14px; border-radius: 10px;
     background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.25);
@@ -110,6 +118,13 @@
       <div class="verdict">
         <span class="label" id="label">Start typing</span>
         <span class="muted" id="guesses"></span>
+      </div>
+
+      <div class="examples" id="examples" aria-label="Example passwords to try">
+        <span class="examples-label">Try one:</span>
+        <button type="button" data-pw="password123">password123</button>
+        <button type="button" data-pw="Sunset!7river">Sunset!7river</button>
+        <button type="button" data-pw="correct horse battery staple">a passphrase</button>
       </div>
 
       <div class="stats">
@@ -290,6 +305,14 @@
     pw.type = showing ? "password" : "text";
     toggle.textContent = showing ? "show" : "hide";
     pw.focus();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("#examples button"), function (btn) {
+    btn.addEventListener("click", function () {
+      pw.value = btn.getAttribute("data-pw");
+      render();
+      pw.focus();
+    });
   });
 
   pw.addEventListener("input", render);
